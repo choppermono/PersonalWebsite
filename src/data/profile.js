@@ -2,23 +2,38 @@
 // Add an entry to accessPoints and it shows up in the list — no template edits.
 
 export const identity = {
-  handle: 'HALLDOR HUB',
+  handle: 'Halldor Personal',
   operator: 'Halldor Andri Omarsson',
   // Decorative system readouts. Nothing here is real data.
   designation: 'UNIT 0-H',
   build: 'v2.0',
 }
 
-// icon must be one of the names defined in components/NodeIcon.vue
+// icon     — a name from components/NodeIcon.vue
+// vignette — optional, a name from components/NodeVignette.vue. Marks a featured row.
+// effect   — optional, 'decrypt' scrambles the label into place on hover and focus
 export const accessPoints = [
   {
-    id: 'florian',
-    label: 'Florian Halldor',
-    desc: 'Current project workspace',
+    id: 'nier',
+    label: 'NieR Hack Game',
+    desc: 'Hacking minigame — cores shoot back',
+    url: 'https://nier.halldor.ch',
+    host: 'nier.halldor.ch',
+    kind: 'GAME',
+    icon: 'hack',
+    vignette: 'hack',
+    effect: 'decrypt',
+    external: true,
+  },
+  {
+    id: 'trackify',
+    label: 'Trackify',
+    desc: 'Fitness and health tracker',
     url: 'https://florian.halldor.ch',
     host: 'florian.halldor.ch',
-    kind: 'PROJECT',
-    icon: 'globe',
+    kind: 'APP',
+    icon: 'dumbbell',
+    vignette: 'pulse',
     external: true,
   },
   {

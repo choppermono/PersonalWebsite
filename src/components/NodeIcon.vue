@@ -34,6 +34,22 @@ defineProps({
       <path d="m3 7 9 6 9-6" />
     </template>
 
+    <!-- The hacking avatar: an arrowhead ship with its thruster trail -->
+    <template v-else-if="name === 'hack'">
+      <path d="M12 2.5 19 20l-7-4-7 4Z" />
+      <path d="M12 16v5.5" stroke-dasharray="1.2 1.8" />
+      <circle cx="12" cy="11" r="1.1" fill="currentColor" stroke="none" />
+    </template>
+
+    <!-- Same glyph Trackify uses for its own Training tab -->
+    <template v-else-if="name === 'dumbbell'">
+      <path d="M8 12h8" />
+      <rect x="5" y="7" width="3" height="10" rx="1" />
+      <rect x="16" y="7" width="3" height="10" rx="1" />
+      <path d="M5 9.5H3.5a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1H5" />
+      <path d="M19 9.5h1.5a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H19" />
+    </template>
+
     <!-- Fallback keeps the layout stable if a data entry has a typo -->
     <template v-else>
       <circle cx="12" cy="12" r="9" />

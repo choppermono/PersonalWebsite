@@ -1,24 +1,70 @@
 <script setup>
+import { ref, onBeforeUnmount } from 'vue'
 import NodeIcon from './NodeIcon.vue'
+import NodeVignette from './NodeVignette.vue'
 
-defineProps({
+const props = defineProps({
   node: { type: Object, required: true },
   index: { type: Number, required: true },
 })
 
 // Pointer and keyboard both report activity, so nothing is hover-locked.
 const emit = defineEmits(['engage'])
+
+// --- decrypt effect ---------------------------------------------------------
+// The real label never changes, so the accessible name stays stable. The
+// scrambled copy is an aria-hidden overlay laid over a transparent original,
+// which also keeps the row from reflowing while the glyphs churn.
+
+const GLYPHS = 'AEHIKMNRSTXZ/#'
+const STEPS = 12
+const STEP_MS = 32
+
+const scramble = ref('')
+let timer = 0
+
+function decrypt() {
+  if (props.node.effect !== 'decrypt') return
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+  const target = props.node.label.toUpperCase()
+  let step = 0
+
+  clearInterval(timer)
+  timer = setInterval(() => {
+    step += 1
+    const settled = Math.floor((step / STEPS) * target.length)
+    scramble.value = [...target]
+      .map((ch, i) =>
+        ch === ' ' || i < settled ? ch : GLYPHS[Math.floor(Math.random() * GLYPHS.length)],
+      )
+      .join('')
+
+    if (step >= STEPS) {
+      clearInterval(timer)
+      scramble.value = ''
+    }
+  }, STEP_MS)
+}
+
+function engage() {
+  emit('engage', props.node.id)
+  decrypt()
+}
+
+onBeforeUnmount(() => clearInterval(timer))
 </script>
 
 <template>
   <li class="node">
     <a
       class="node__link"
+      :class="{ 'node__link--featured': node.vignette }"
       :href="node.url"
       :target="node.external ? '_blank' : null"
       :rel="node.external ? 'noopener noreferrer' : null"
-      @mouseenter="emit('engage', node.id)"
-      @focus="emit('engage', node.id)"
+      @mouseenter="engage"
+      @focus="engage"
     >
       <span class="node__marker" aria-hidden="true"></span>
 
@@ -31,9 +77,16 @@ const emit = defineEmits(['engage'])
       </span>
 
       <span class="node__text">
-        <span class="node__label">{{ node.label }}</span>
+        <span class="node__label">
+          <span :class="{ 'is-masked': scramble }">{{ node.label }}</span>
+          <span v-if="scramble" class="node__scramble" aria-hidden="true">{{ scramble }}</span>
+        </span>
         <span class="node__desc">{{ node.desc }}</span>
         <span class="node__host label">{{ node.host }}</span>
+      </span>
+
+      <span v-if="node.vignette" class="node__vignette">
+        <NodeVignette :name="node.vignette" />
       </span>
 
       <span class="node__kind label" aria-hidden="true">{{ node.kind }}</span>
@@ -59,16 +112,22 @@ const emit = defineEmits(['engage'])
 </template>
 
 <style scoped>
+/* The row lays itself out by its own width, not the viewport's: the list is
+   narrow in the two-column desktop layout and wide on a tablet. */
 .node {
   list-style: none;
+  container: node / inline-size;
 }
 
 .node__link {
   position: relative;
   display: grid;
-  grid-template-columns: 14px auto 22px 1fr auto 20px;
+  /* kind gets a fixed track so both featured rows line their vignettes up */
+  grid-template-columns: 14px auto 22px minmax(0, 1fr) auto 4.25rem 20px;
+  grid-template-areas: 'marker index icon text vignette kind arrow';
   align-items: center;
-  gap: var(--s-3);
+  column-gap: var(--s-3);
+  row-gap: var(--s-2);
   min-height: 76px; /* well past the 44px touch minimum */
   padding: var(--s-3) var(--s-4);
   border: 1px solid var(--line);
@@ -83,6 +142,12 @@ const emit = defineEmits(['engage'])
     transform var(--base) var(--ease);
 }
 
+/* Featured rows carry a little more weight at rest. */
+.node__link--featured {
+  border-color: var(--line-strong);
+  background: linear-gradient(180deg, rgba(220, 216, 192, 0.06), rgba(220, 216, 192, 0.01));
+}
+
 /* The NieR selection: the row fills with bone and the text inverts. */
 .node__link:hover,
 .node__link:focus-visible {
@@ -93,6 +158,7 @@ const emit = defineEmits(['engage'])
 }
 
 .node__marker {
+  grid-area: marker;
   width: 0;
   height: 0;
   border-top: 5px solid transparent;
@@ -113,11 +179,13 @@ const emit = defineEmits(['engage'])
 }
 
 .node__index {
+  grid-area: index;
   color: var(--bone-mute);
   transition: color var(--fast) var(--ease);
 }
 
 .node__icon {
+  grid-area: icon;
   width: 22px;
   height: 22px;
   color: var(--bone-dim);
@@ -125,6 +193,7 @@ const emit = defineEmits(['engage'])
 }
 
 .node__text {
+  grid-area: text;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -132,12 +201,24 @@ const emit = defineEmits(['engage'])
 }
 
 .node__label {
+  position: relative;
   font-family: var(--display);
   font-size: 1.5rem;
   font-weight: 500;
   line-height: 1.15;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+/* transparent, not visibility:hidden — hidden text drops out of the accessibility tree */
+.is-masked {
+  color: transparent;
+}
+
+.node__scramble {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
 
 .node__desc {
@@ -156,13 +237,25 @@ const emit = defineEmits(['engage'])
   transition: color var(--fast) var(--ease);
 }
 
+.node__vignette {
+  grid-area: vignette;
+  justify-self: start;
+  width: 150px; /* the SVG's native 150x52 — no scaling blur on the thin strokes */
+  height: 52px;
+  color: var(--bone-dim);
+  transition: color var(--fast) var(--ease);
+}
+
 .node__kind {
+  grid-area: kind;
+  justify-self: end;
   color: var(--bone-mute);
   white-space: nowrap;
   transition: color var(--fast) var(--ease);
 }
 
 .node__arrow {
+  grid-area: arrow;
   width: 20px;
   height: 20px;
   color: var(--bone-mute);
@@ -185,6 +278,8 @@ const emit = defineEmits(['engage'])
 .node__link:focus-visible .node__desc,
 .node__link:hover .node__icon,
 .node__link:focus-visible .node__icon,
+.node__link:hover .node__vignette,
+.node__link:focus-visible .node__vignette,
 .node__link:hover .node__arrow,
 .node__link:focus-visible .node__arrow {
   color: rgba(16, 15, 13, 0.86);
@@ -200,11 +295,38 @@ const emit = defineEmits(['engage'])
   outline-offset: 3px;
 }
 
-@media (max-width: 640px) {
+/* Medium rows: the vignette drops under the text instead of squeezing it. */
+@container node (max-width: 620px) {
   .node__link {
-    grid-template-columns: 10px auto 20px 1fr;
-    gap: var(--s-2) var(--s-3);
+    grid-template-columns: 14px auto 22px minmax(0, 1fr) 4.25rem 20px;
+    grid-template-areas: 'marker index icon text kind arrow';
+  }
+
+  .node__link--featured {
+    grid-template-areas:
+      'marker index icon text kind arrow'
+      '. . . vignette vignette vignette';
+  }
+
+  /* Stacked, the scene has the whole text width to itself — use more of it. */
+  .node__vignette {
+    width: 168px;
+    height: 58px;
+  }
+}
+
+/* Narrow rows: drop kind and arrow, the row itself is the affordance. */
+@container node (max-width: 460px) {
+  .node__link {
+    grid-template-columns: 10px auto 20px minmax(0, 1fr);
+    grid-template-areas: 'marker index icon text';
     padding: var(--s-3);
+  }
+
+  .node__link--featured {
+    grid-template-areas:
+      'marker index icon text'
+      '. . . vignette';
   }
 
   .node__kind,
