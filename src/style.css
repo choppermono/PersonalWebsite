@@ -114,6 +114,93 @@ a {
   color: var(--bone-dim);
 }
 
+/* Hack mode owns the screen: no page scroll behind the arena. */
+html.is-hacking {
+  overflow: hidden;
+}
+
+kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  font-family: var(--mono);
+  font-size: 0.625rem;
+  line-height: 1.4;
+  color: var(--bone);
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+}
+
+/* ---------- animatable custom properties ----------
+   Registered so they interpolate: --angle drives the light that runs round a
+   panel border, --pct counts a link bar up from 0 to 100. */
+
+@property --angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --pct {
+  syntax: '<integer>';
+  inherits: true;
+  initial-value: 0;
+}
+
+@keyframes trace {
+  to {
+    --angle: 360deg;
+  }
+}
+
+/* ---------- instrument tiles (Operator dossier) ---------- */
+
+.inst {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 11px 12px 12px;
+  background: #131210;
+}
+
+/* A tick in the top-left corner of every tile. */
+.inst::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: 7px;
+  height: 7px;
+  border-top: 1px solid var(--bone);
+  border-left: 1px solid var(--bone);
+}
+
+.inst__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.inst__aux {
+  color: var(--bone-mute);
+}
+
+.inst__value {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  color: var(--bone);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.inst__value--lg {
+  font-size: 1.125rem;
+  letter-spacing: 0.04em;
+}
+
 ::selection {
   background: var(--bone);
   color: var(--void);

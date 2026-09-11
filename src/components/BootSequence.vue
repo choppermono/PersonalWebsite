@@ -5,8 +5,8 @@ const emit = defineEmits(['done'])
 
 const LINES = [
   'INITIALIZING SYSTEM',
-  'CHECKING LINK STATUS ......... OK',
-  'LOADING PROFILE DATA ......... OK',
+  'MOUNTING HOLOGRAPHIC LAYER ... OK',
+  'LOADING OPERATOR DOSSIER ..... OK',
   'CONNECTION ESTABLISHED',
 ]
 

@@ -9,9 +9,9 @@ export const identity = {
   build: 'v2.0',
 }
 
-// icon     — a name from components/NodeIcon.vue
-// vignette — optional, a name from components/NodeVignette.vue. Marks a featured row.
-// effect   — optional, 'decrypt' scrambles the label into place on hover and focus
+// icon — a name from components/NodeIcon.vue (the chip and the no-WebGL fallback)
+// holo — the hologram on the terminal's screen: a key of `views` in three/holo/index.js
+// cta  — what the terminal says it will do
 export const accessPoints = [
   {
     id: 'nier',
@@ -21,8 +21,8 @@ export const accessPoints = [
     host: 'nier.halldor.ch',
     kind: 'GAME',
     icon: 'hack',
-    vignette: 'hack',
-    effect: 'decrypt',
+    holo: 'hack',
+    cta: 'Launch game',
     external: true,
   },
   {
@@ -33,7 +33,8 @@ export const accessPoints = [
     host: 'florian.halldor.ch',
     kind: 'APP',
     icon: 'dumbbell',
-    vignette: 'pulse',
+    holo: 'pulse',
+    cta: 'Open app',
     external: true,
   },
   {
@@ -44,6 +45,8 @@ export const accessPoints = [
     host: '@halldor0',
     kind: 'SOCIAL',
     icon: 'instagram',
+    holo: 'lens',
+    cta: 'View profile',
     external: true,
   },
   {
@@ -54,6 +57,8 @@ export const accessPoints = [
     host: 'halldorandri.omarsson@gmail.com',
     kind: 'CONTACT',
     icon: 'mail',
+    holo: 'mail',
+    cta: 'Write mail',
     external: false,
   },
 ]
