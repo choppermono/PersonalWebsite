@@ -42,8 +42,19 @@
   --slow: 620ms;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 
+  /* --- Layout --- */
+  --nav-h: 64px;
+  --gutter: clamp(18px, 4.5vw, 64px);
+  --wrap: 1320px;
+
   color-scheme: dark;
   font-size: 16px;
+}
+
+/* Anchor jumps glide, and stop below the fixed nav instead of under it. */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--nav-h) + 12px);
 }
 
 *,
@@ -206,7 +217,141 @@ kbd {
   color: var(--void);
 }
 
+/* ---------- page layout ---------- */
+
+/* Content column. Section rules and bands run edge to edge outside it. */
+.wrap {
+  width: min(100% - 2 * var(--gutter), var(--wrap));
+  margin-inline: auto;
+}
+
+/* A page section: generous air, and a hairline across the full viewport. */
+.section {
+  position: relative;
+  padding-block: clamp(96px, 13vw, 176px);
+  border-top: 1px solid var(--line);
+}
+
+/* The hero's ticker band already draws that line. */
+.hero + .section {
+  border-top: 0;
+}
+
+/* ---------- scroll reveal (directives/reveal.js) ---------- */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 760ms var(--ease) var(--reveal-delay, 0ms),
+    transform 760ms var(--ease) var(--reveal-delay, 0ms);
+}
+
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- command button: the NieR menu line that fills with bone ---------- */
+
+.cmd {
+  --c: 10px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 18px;
+  font: 500 0.75rem/1 var(--mono);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--bone);
+  background:
+    repeating-linear-gradient(-45deg, rgba(220, 216, 192, 0.05) 0 6px, transparent 6px 12px),
+    rgba(16, 15, 13, 0.7);
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c));
+  cursor: pointer;
+  overflow: hidden;
+  text-decoration: none;
+  transition: color var(--fast) var(--ease);
+}
+
+.cmd__fill {
+  position: absolute;
+  inset: 0;
+  background: var(--bone);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 420ms var(--ease);
+}
+
+.cmd > :not(.cmd__fill) {
+  position: relative;
+  white-space: nowrap;
+}
+
+.cmd__mark {
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 8px solid var(--sig-fill);
+}
+
+.cmd__meta {
+  margin-left: auto;
+  font-size: 0.625rem;
+  letter-spacing: 0.16em;
+  color: var(--bone-mute);
+  transition: color var(--fast) var(--ease);
+}
+
+.cmd__arrow {
+  width: 14px;
+  height: 14px;
+  transition: transform var(--base) var(--ease);
+}
+
+.cmd:hover,
+.cmd:focus-visible {
+  color: var(--void);
+}
+
+.cmd:hover .cmd__fill,
+.cmd:focus-visible .cmd__fill {
+  transform: scaleX(1);
+}
+
+.cmd:hover .cmd__meta,
+.cmd:focus-visible .cmd__meta {
+  color: rgba(16, 15, 13, 0.65);
+}
+
+.cmd:hover .cmd__arrow,
+.cmd:focus-visible .cmd__arrow {
+  transform: translate(3px, -3px);
+}
+
+/* clip-path would cut an outline off, so focus is drawn inside the shape */
+.cmd:focus-visible {
+  outline: none;
+}
+
+.cmd:focus-visible::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 2px solid var(--sig-fill);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+
   *,
   *::before,
   *::after {

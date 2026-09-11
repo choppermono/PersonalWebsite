@@ -19,6 +19,7 @@ import {
   IcosahedronGeometry,
   Vector3,
   MathUtils,
+  CatmullRomCurve3,
 } from 'three'
 import { COLOR, srgb, ease, createTweens, motionQuery, disposeTree } from './palette.js'
 import { createHackGame } from './game.js'
@@ -26,6 +27,25 @@ import { createHackGame } from './game.js'
 // Where the camera rests in orbit, and where the dive ends just above the grid.
 const ORBIT = { pos: new Vector3(0, 1.5, 22), look: new Vector3(0, -2.5, 0), fov: 50 }
 const DIVE = { pos: new Vector3(0, -15, -15), look: new Vector3(0, -46, -30), fov: 96 }
+
+// The flight the page scrolls through. Top of the page is the orbit view; each
+// section brings the camera lower and closer, until the footer skims the
+// planet's grid with the horizon across the screen. Every point keeps well
+// clear of the planet (centre 0/-80/-30, radius 56).
+const FLIGHT = {
+  pos: new CatmullRomCurve3([
+    ORBIT.pos.clone(),
+    new Vector3(-7, -3, 14),
+    new Vector3(9, -9, 6),
+    new Vector3(0, -14, -2),
+  ]),
+  look: new CatmullRomCurve3([
+    ORBIT.look.clone(),
+    new Vector3(3, -16, -24),
+    new Vector3(-6, -30, -34),
+    new Vector3(0, -24, -60),
+  ]),
+}
 
 const STAR_VERT = /* glsl */ `
   uniform float uTime;
@@ -238,6 +258,23 @@ export function createBackdrop(canvas, { onGame, onFlash } = {}) {
   let last = 0
   let elapsed = 0
   const pointer = { x: 0, y: 0 }
+  // Page scroll as 0..1, and the eased value the camera actually follows.
+  let scroll = 0
+  let flight = 0
+  let spin = 0
+  const flightPos = new Vector3()
+  const flightLook = new Vector3()
+
+  // Where the camera belongs for the current scroll position. Reduced motion
+  // keeps it in orbit: no scroll-driven movement at all.
+  function flightPose() {
+    const t = reduced ? 0 : flight
+    return {
+      pos: FLIGHT.pos.getPoint(t, new Vector3()),
+      look: FLIGHT.look.getPoint(t, new Vector3()),
+      fov: ORBIT.fov,
+    }
+  }
 
   function getGame() {
     game ??= createHackGame({ scene, camera, canvas, emit: (e) => onGame?.(e), isReduced: () => reduced })
@@ -264,16 +301,24 @@ export function createBackdrop(canvas, { onGame, onFlash } = {}) {
   function updateSpace(dt) {
     if (!reduced) {
       elapsed += dt
-      planet.spin.rotation.y += dt * 0.018
+      spin += dt * 0.018
       debris.update(dt)
       for (const m of starMats) m.uniforms.uTime.value = elapsed
+      // Scrolling also turns the planet a little, so the grid visibly travels.
+      flight += (scroll - flight) * (1 - Math.pow(0.04, dt))
+      planet.spin.rotation.y = spin + flight * 0.9
     }
     if (mode !== 'space') return
+    // The flight path sets the base; the pointer adds a little parallax on top.
     const k = 1 - Math.pow(0.1, dt)
-    const tx = ORBIT.pos.x + (reduced ? 0 : pointer.x * 1.8 + Math.sin(elapsed * 0.07) * 0.6)
-    const ty = ORBIT.pos.y + (reduced ? 0 : -pointer.y * 0.9)
+    FLIGHT.pos.getPoint(reduced ? 0 : flight, flightPos)
+    FLIGHT.look.getPoint(reduced ? 0 : flight, flightLook)
+    const tx = flightPos.x + (reduced ? 0 : pointer.x * 1.8 + Math.sin(elapsed * 0.07) * 0.6)
+    const ty = flightPos.y + (reduced ? 0 : -pointer.y * 0.9)
     camera.position.x += (tx - camera.position.x) * k
     camera.position.y += (ty - camera.position.y) * k
+    camera.position.z += (flightPos.z - camera.position.z) * k
+    look.copy(flightLook)
     camera.lookAt(look)
   }
 
@@ -356,8 +401,9 @@ export function createBackdrop(canvas, { onGame, onFlash } = {}) {
     scene.fog = spaceFog
     space.visible = true
     planet.gridMat.opacity = 0.13
+    const home = flightPose()
     if (reduced) {
-      setPose(ORBIT)
+      setPose(home)
       mode = 'space'
       ensureLoop()
       renderOnce()
@@ -370,9 +416,9 @@ export function createBackdrop(canvas, { onGame, onFlash } = {}) {
       1300,
       (t) => {
         const e = ease.outCubic(t)
-        camera.position.lerpVectors(DIVE.pos, ORBIT.pos, e)
-        look.lerpVectors(DIVE.look, ORBIT.look, e)
-        camera.fov = MathUtils.lerp(DIVE.fov, ORBIT.fov, e)
+        camera.position.lerpVectors(DIVE.pos, home.pos, e)
+        look.lerpVectors(DIVE.look, home.look, e)
+        camera.fov = MathUtils.lerp(DIVE.fov, home.fov, e)
         camera.updateProjectionMatrix()
         camera.lookAt(look)
       },
@@ -391,16 +437,28 @@ export function createBackdrop(canvas, { onGame, onFlash } = {}) {
     pointer.x = (e.clientX / window.innerWidth) * 2 - 1
     pointer.y = (e.clientY / window.innerHeight) * 2 - 1
   }
+  // Read on scroll, applied in the loop. scrollHeight is a layout read, but
+  // nothing writes to the DOM here, so it doesn't force a second layout.
+  function onScroll() {
+    const max = document.documentElement.scrollHeight - window.innerHeight
+    scroll = max > 0 ? MathUtils.clamp(window.scrollY / max, 0, 1) : 0
+  }
   function onMotion(e) {
     reduced = e.matches
+    if (reduced && mode === 'space') setPose(flightPose())
     ensureLoop()
   }
 
   window.addEventListener('resize', resize)
+  window.addEventListener('resize', onScroll)
+  window.addEventListener('scroll', onScroll, { passive: true })
   window.addEventListener('pointermove', onPointer, { passive: true })
   document.addEventListener('visibilitychange', ensureLoop)
   mq.addEventListener('change', onMotion)
 
+  onScroll()
+  flight = scroll
+  if (!reduced) setPose(flightPose())
   resize()
   ensureLoop()
 
@@ -411,6 +469,8 @@ export function createBackdrop(canvas, { onGame, onFlash } = {}) {
     dispose() {
       renderer.setAnimationLoop(null)
       window.removeEventListener('resize', resize)
+      window.removeEventListener('resize', onScroll)
+      window.removeEventListener('scroll', onScroll)
       window.removeEventListener('pointermove', onPointer)
       document.removeEventListener('visibilitychange', ensureLoop)
       mq.removeEventListener('change', onMotion)
