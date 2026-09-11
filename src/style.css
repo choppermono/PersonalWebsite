@@ -125,8 +125,9 @@ a {
   color: var(--bone-dim);
 }
 
-/* Hack mode owns the screen: no page scroll behind the arena. */
-html.is-hacking {
+/* Hack mode and the boot sequence own the screen: no page scroll behind them. */
+html.is-hacking,
+html.is-booting {
   overflow: hidden;
 }
 

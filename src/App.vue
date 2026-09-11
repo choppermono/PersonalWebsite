@@ -12,7 +12,54 @@ import ContactSection from './components/ContactSection.vue'
 import SiteFooter from './components/SiteFooter.vue'
 import HackHud from './components/HackHud.vue'
 
+// ---------- boot ----------
+// preload: waiting for three.js · intro: the 3D sequence plays · fallback: text only.
+const calmAtLoad = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 const booting = ref(true)
+const wantIntro = ref(!calmAtLoad)
+const bootMode = ref(calmAtLoad ? 'fallback' : 'preload')
+const intro = reactive({ phase: null, progress: 0, seconds: 0 })
+
+function toFallback() {
+  if (bootMode.value !== 'preload') return
+  // Opened in a background tab: the sequence can't start until it is seen, so
+  // the five seconds only count once the tab is visible.
+  if (document.hidden) {
+    document.addEventListener('visibilitychange', () => setTimeout(toFallback, 5000), { once: true })
+    return
+  }
+  wantIntro.value = false
+  bootMode.value = 'fallback'
+  // The engine may already be compiling the sequence; it must not start behind the page.
+  backdrop.value?.skipIntro()
+}
+// Nobody waits more than five seconds for a show. three.js arriving later just
+// brings the orbit up without the sequence.
+const preloadTimer = setTimeout(toFallback, 5000)
+
+function onIntro(e) {
+  if (e.type === 'phase') {
+    clearTimeout(preloadTimer)
+    bootMode.value = 'intro'
+    intro.phase = e.phase
+  } else if (e.type === 'progress') {
+    intro.progress = e.value
+    intro.seconds = e.seconds
+  } else if (e.type === 'done') {
+    booting.value = false
+  }
+}
+
+function skipBoot() {
+  clearTimeout(preloadTimer)
+  wantIntro.value = false
+  backdrop.value?.skipIntro()
+  booting.value = false
+}
+
+// No scrolling under the boot screen: scroll position steers the camera.
+watch(booting, (on) => document.documentElement.classList.toggle('is-booting', on), { immediate: true })
+
 const activeId = ref(accessPoints[0]?.id ?? null)
 const activeNode = computed(() => accessPoints.find((n) => n.id === activeId.value) ?? accessPoints[0])
 const featured = accessPoints.filter((n) => n.feature)
@@ -47,6 +94,7 @@ let hackSource = 'hero'
 const threeReady = ref(false)
 const threeOffline = ref(false)
 const hacking = ref(false)
+watch(threeOffline, (off) => off && toFallback())
 const breached = ref(false)
 const glitching = ref(false)
 
@@ -67,8 +115,12 @@ const SLICES = [
   [88, 3, -12],
 ]
 
-// Nobody needs the holograms drawing behind the arena.
-watch(hacking, async (on) => (await holo)?.stage.setPaused(on))
+// Nobody needs the holograms drawing behind the arena or the boot sequence.
+watch(
+  () => hacking.value || booting.value,
+  async (on) => (await holo)?.stage.setPaused(on),
+  { immediate: true },
+)
 
 function startHack(source = 'hero') {
   if (hacking.value || !threeReady.value) return
@@ -129,7 +181,9 @@ function onFlash() {
   <SpaceBackdrop
     ref="backdrop"
     :active="hacking"
+    :intro="wantIntro"
     @ready="threeReady = true"
+    @intro="onIntro"
     @failed="threeOffline = true"
     @game="onGame"
     @flash="onFlash"
@@ -142,7 +196,15 @@ function onFlash() {
   <div class="vignette" :class="{ 'is-soft': hacking }" aria-hidden="true"></div>
 
   <CursorReticle />
-  <BootSequence v-if="booting" @done="booting = false" />
+  <BootSequence
+    v-if="booting"
+    :mode="bootMode"
+    :phase="intro.phase"
+    :progress="intro.progress"
+    :seconds="intro.seconds"
+    @done="booting = false"
+    @skip="skipBoot"
+  />
 
   <div v-if="glitching" class="glitch" aria-hidden="true">
     <span
@@ -153,7 +215,7 @@ function onFlash() {
     ></span>
   </div>
 
-  <div class="site" :class="{ 'is-away': hacking }" :inert="hacking ? '' : null">
+  <div class="site" :class="{ 'is-away': hacking || booting }" :inert="hacking || booting ? '' : null">
     <SiteNav ref="nav" :armed="threeReady" :offline="threeOffline" @hack="startHack('nav')" />
 
     <main>

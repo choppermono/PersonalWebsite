@@ -5,10 +5,12 @@ import StarField from './StarField.vue'
 // Full-screen WebGL layer: the orbit view behind the page, and the arena in
 // hack mode. three.js loads after first paint; until then, or if WebGL is
 // missing, the 2D starfield stands in.
-defineProps({
+const props = defineProps({
   active: { type: Boolean, default: false },
+  // Read once, when three.js has arrived: play the boot sequence first?
+  intro: { type: Boolean, default: false },
 })
-const emit = defineEmits(['ready', 'failed', 'game', 'flash'])
+const emit = defineEmits(['ready', 'failed', 'game', 'flash', 'intro'])
 
 const canvas = ref(null)
 const ready = ref(false)
@@ -22,6 +24,8 @@ onMounted(async () => {
     engine = createBackdrop(canvas.value, {
       onGame: (e) => emit('game', e),
       onFlash: () => emit('flash'),
+      onIntro: (e) => emit('intro', e),
+      intro: props.intro,
     })
     ready.value = true
     // Keep the 2D stars until the WebGL canvas has faded in over them.
@@ -39,6 +43,7 @@ onBeforeUnmount(() => {
 })
 
 defineExpose({
+  skipIntro: () => engine?.skipIntro(),
   enterHack: () => engine?.enterHack(),
   exitHack: () => engine?.exitHack(),
   restartHack: () => engine?.restartHack(),

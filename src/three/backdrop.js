@@ -23,6 +23,7 @@ import {
 } from 'three'
 import { COLOR, srgb, ease, createTweens, motionQuery, disposeTree } from './palette.js'
 import { createHackGame } from './game.js'
+import { createIntro } from './intro.js'
 
 // Where the camera rests in orbit, and where the dive ends just above the grid.
 const ORBIT = { pos: new Vector3(0, 1.5, 22), look: new Vector3(0, -2.5, 0), fov: 50 }
@@ -225,7 +226,7 @@ function buildDebris() {
   }
 }
 
-export function createBackdrop(canvas, { onGame, onFlash } = {}) {
+export function createBackdrop(canvas, { onGame, onFlash, onIntro, intro: wantIntro = false } = {}) {
   const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
   renderer.setClearColor(COLOR.void, 1)
 
@@ -252,7 +253,8 @@ export function createBackdrop(canvas, { onGame, onFlash } = {}) {
   const starMats = [stars.material, dust.material, planet.nodes.material]
 
   const tweens = createTweens()
-  let mode = 'space' // space | dive | arena | surface
+  let mode = 'space' // intro | space | dive | arena | surface
+  let intro = null
   let game = null
   let looping = false
   let last = 0
@@ -326,9 +328,52 @@ export function createBackdrop(canvas, { onGame, onFlash } = {}) {
     const dt = last ? Math.min((time - last) / 1000, 0.1) : 1 / 60
     last = time
     tweens.update(dt)
+    if (mode === 'intro') {
+      intro.update(dt)
+      if (!intro.done) {
+        intro.render()
+        return
+      }
+      endIntro()
+    }
     if (mode === 'arena') game.update(dt)
     else updateSpace(dt)
     renderer.render(scene, camera)
+  }
+
+  // ---------- boot sequence ----------
+
+  function startIntro() {
+    intro = createIntro({
+      scene,
+      camera,
+      renderer,
+      space,
+      home: flightPose,
+      emit(e) {
+        if (e.type === 'flash') onFlash?.()
+        onIntro?.(e)
+      },
+    })
+    mode = 'intro'
+  }
+
+  // Hands the camera to the orbit exactly where the page expects it.
+  function endIntro() {
+    if (!intro) return
+    intro.dispose()
+    intro = null
+    scene.fog = spaceFog
+    setPose(flightPose())
+    mode = 'space'
+    ensureLoop()
+  }
+
+  function skipIntro() {
+    if (mode !== 'intro') return
+    intro.skip()
+    endIntro()
+    if (!looping) renderOnce()
   }
 
   // Loop only while something moves: always in the arena, in orbit only with motion allowed.
@@ -459,10 +504,12 @@ export function createBackdrop(canvas, { onGame, onFlash } = {}) {
   onScroll()
   flight = scroll
   if (!reduced) setPose(flightPose())
+  if (wantIntro && !reduced) startIntro()
   resize()
   ensureLoop()
 
   return {
+    skipIntro,
     enterHack,
     exitHack,
     restartHack,
@@ -475,6 +522,7 @@ export function createBackdrop(canvas, { onGame, onFlash } = {}) {
       document.removeEventListener('visibilitychange', ensureLoop)
       mq.removeEventListener('change', onMotion)
       game?.dispose()
+      intro?.dispose()
       disposeTree(space)
       renderer.dispose()
     },
